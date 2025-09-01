@@ -5,6 +5,10 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release tag'
+        required: true
 jobs:
   build-mac-ios-android:
     runs-on: macos-latest
@@ -96,6 +100,7 @@ jobs:
         with:
           name: "${{ fromJson(steps.version.outputs.content).version }}"
           body: "${{ fromJson(steps.version.outputs.content).version_desc }}"
+          tag_name: ${{ github.event.inputs.tag_name || github.ref_name }}
           prerelease: ${{ fromJson(steps.version.outputs.content).prerelease }}
           token: ${{ secrets.TOKEN }}
           files: |
