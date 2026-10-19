@@ -20,7 +20,8 @@ pluginManagement {
 plugins {
     id("dev.flutter.flutter-plugin-loader") version "1.0.0"
     id("com.android.application") version "8.9.1" apply false
-    id("org.jetbrains.kotlin.android") version "2.3.21" apply false
+    // use a Kotlin 1.8.x plugin that matches JvmTarget.JVM_17 usage
+    id("org.jetbrains.kotlin.android") version "1.8.22" apply false
 }
 
 include(":app")
