@@ -1,4 +1,4 @@
-name: app-build-android-release
+name: app-build-android-release-self
 
 on:
   push:
