@@ -156,9 +156,17 @@ android {
 }
 
 kotlin {
-    compilerOptions {
+   /* compilerOptions {
         jvmTarget.set(JvmTarget.JVM_11)
+    } */
+// Replace the `compilerOptions { jvmTarget.set(...) }` block with this:
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    kotlinOptions {
+        jvmTarget = "11"
+        // Add any other kotlinOptions you need, e.g.:
+        // freeCompilerArgs += listOf("-Xjvm-default=all")
     }
+}
 }
 
 flutter {
