@@ -1,0 +1,139 @@
+name: app-build-android-release
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      build_android:
+        description: "Build Android on GitHub Actions"
+        type: boolean
+        default: false
+      ref:
+        description: "Git ref to build, for example refs/heads/main or refs/tags/v1.12.0 (optional)"
+        required: false
+        default: ""
+      upload_release:
+        description: "Upload build outputs to the matching GitHub Release when ref is a tag"
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  build-android:
+    if: ${{ github.event_name == 'push' || inputs.build_android == true }}
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.ref != '' && inputs.ref || github.ref }}
+
+      - name: Prepare Android keystore (if provided)
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          if [[ -n "$KEYSTORE_BASE64" && -n "$STORE_PASSWORD" && -n "$KEY_PASSWORD" && -n "$KEY_ALIAS" ]]; then
+            mkdir -p simple_live_app/android
+            echo "$KEYSTORE_BASE64" | base64 --decode > simple_live_app/android/release-keystore.jks
+            # key.properties should live in android/ and reference release-keystore.jks directly
+            printf 'storeFile=release-keystore.jks\nstorePassword=%s\nkeyPassword=%s\nkeyAlias=%s\n' "$STORE_PASSWORD" "$KEY_PASSWORD" "$KEY_ALIAS" > simple_live_app/android/key.properties
+          else
+            echo "Keystore secrets not provided — building unsigned APK."
+          fi
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "zulu"
+          java-version: "17"
+          cache: "gradle"
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.41.9"
+          cache: true
+
+      - name: Restore Packages
+        run: |
+          cd simple_live_app
+          flutter pub get
+
+      - name: Read app version
+        id: app_version
+        shell: bash
+        run: |
+          # take the version before the +build metadata (e.g. 1.2.3+4 -> 1.2.3)
+          app_version="$(grep '^version:' simple_live_app/pubspec.yaml | awk '{print $2}' | cut -d'+' -f1 | tr -d '[:space:]')"
+          echo "app_version=$app_version" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve ref info
+        id: ref_info
+        shell: bash
+        run: |
+          # Prefer input ref if provided (workflow_dispatch), else use GITHUB_REF
+          ref_name="${{ inputs.ref }}"
+          if [[ -z "$ref_name" ]]; then
+            ref_name="$GITHUB_REF"
+          fi
+          # normalize refs/heads/... and refs/tags/...
+          if [[ "$ref_name" == refs/tags/* ]]; then
+            ref_name="${ref_name#refs/tags/}"
+          elif [[ "$ref_name" == refs/heads/* ]]; then
+            ref_name="${ref_name#refs/heads/}"
+          fi
+          is_tag="false"
+          if [[ "$GITHUB_REF" == refs/tags/* || "${{ inputs.ref }}" == refs/tags/* || "$ref_name" =~ ^v ]]; then
+            is_tag="true"
+          fi
+          prerelease="false"
+          if [[ "$ref_name" == *beta* || "$ref_name" == *alpha* || "$ref_name" == *pre* ]]; then
+            prerelease="true"
+          fi
+          echo "ref_name=$ref_name" >> "$GITHUB_OUTPUT"
+          echo "is_tag=$is_tag" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+
+      - name: Build Android APK
+        run: |
+          cd simple_live_app
+          flutter build apk --release
+
+      - name: Rename APK for release
+        id: apk_asset
+        shell: bash
+        run: |
+          asset_dir="simple_live_app/build/app/outputs/flutter-apk"
+          asset_name="simple_live_app-${{ steps.app_version.outputs.app_version }}-android.apk"
+          cp "$asset_dir/app-release.apk" "$asset_dir/$asset_name"
+          echo "asset_path=$asset_dir/$asset_name" >> "$GITHUB_OUTPUT"
+
+      - name: Upload APK to Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: ${{ steps.apk_asset.outputs.asset_path }}
+
+      - name: Upload Release (attach APK to GitHub Release)
+        if: ${{ inputs.upload_release == true && steps.ref_info.outputs.is_tag == 'true' }}
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.ref_info.outputs.ref_name }}
+          name: ${{ steps.ref_info.outputs.ref_name }}
+          files: ${{ steps.apk_asset.outputs.asset_path }}
+          prerelease: ${{ steps.ref_info.outputs.prerelease }}
+          token: ${{ github.token }}
+
+      - run: echo "Android job status is ${{ job.status }}."
