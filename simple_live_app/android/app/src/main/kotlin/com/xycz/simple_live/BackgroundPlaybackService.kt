@@ -27,15 +27,15 @@ class BackgroundPlaybackService : Service() {
     private lateinit var notificationManager: NotificationManager
     private var mediaSession: MediaSessionCompat? = null
     private var wifiLock: WifiManager.WifiLock? = null
-    private lateinit var audioManager: AudioManager
+  /*  private lateinit var audioManager: AudioManager
     private var audioFocusRequest: AudioFocusRequest? = null
-    private var focusRequested = false
+    private var focusRequested = false */
 
     private var currentState = STATE_PLAYING
     private var currentTitle = ""
     private var currentSubtitle = ""
 
-    private val focusListener = AudioManager.OnAudioFocusChangeListener { change ->
+ /*   private val focusListener = AudioManager.OnAudioFocusChangeListener { change ->
         val state = when (change) {
             AudioManager.AUDIOFOCUS_GAIN -> "gain"
             AudioManager.AUDIOFOCUS_LOSS -> "loss"
@@ -44,7 +44,7 @@ class BackgroundPlaybackService : Service() {
             else -> "unknown"
         }
         emit(EVENT_AUDIO_FOCUS, mapOf("state" to state))
-    }
+    } */
 
     private val sessionCallback = object : MediaSessionCompat.Callback() {
         override fun onPlay() {
@@ -65,7 +65,7 @@ class BackgroundPlaybackService : Service() {
     override fun onCreate() {
         super.onCreate()
         notificationManager = getSystemService(NotificationManager::class.java)
-        audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+      //  audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         createNotificationChannel()
         createMediaSession()
         acquireWifiLock()
@@ -79,7 +79,7 @@ class BackgroundPlaybackService : Service() {
             applyExtras(it)
         }
         promoteToForeground(buildNotification())
-        requestAudioFocus()
+      //  requestAudioFocus()
         return START_NOT_STICKY
     }
 
@@ -152,7 +152,7 @@ class BackgroundPlaybackService : Service() {
         }
     }
 
-    private fun requestAudioFocus() {
+  /*  private fun requestAudioFocus() {
         if (focusRequested) {
             return
         }
@@ -181,9 +181,9 @@ class BackgroundPlaybackService : Service() {
         } catch (t: Throwable) {
             Log.w(TAG, "requestAudioFocus failed: ${t.message}")
         }
-    }
+    } */
 
-    private fun abandonAudioFocus() {
+/*    private fun abandonAudioFocus() {
         if (!focusRequested) {
             return
         }
@@ -199,7 +199,7 @@ class BackgroundPlaybackService : Service() {
         }
         audioFocusRequest = null
         focusRequested = false
-    }
+    } */
 
     private fun updateMediaSession() {
         val session = mediaSession ?: return
@@ -314,7 +314,7 @@ class BackgroundPlaybackService : Service() {
     }
 
     override fun onDestroy() {
-        abandonAudioFocus()
+       // abandonAudioFocus()
         try {
             wifiLock?.let { if (it.isHeld) it.release() }
         } catch (_: Throwable) {
