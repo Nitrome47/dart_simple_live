@@ -1,3 +1,15 @@
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+    dependencies {
+        // Make the Kotlin Gradle plugin available to all project build scripts
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.8.22")
+    }
+}
+
 allprojects {
     repositories {
         google()
